@@ -334,10 +334,10 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "yarn compile",
+    "vscode:prepublish": "tsc -p ./",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "yarn compile && node --test"
+    "test": "tsc -p ./ && node --test"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
