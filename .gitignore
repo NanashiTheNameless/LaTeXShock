@@ -1,4 +1,16 @@
+# Dependencies
 node_modules/
+.yarn/cache/
+.yarn/unplugged/
+.pnp*
+
+# Build
 out/
 *.vsix
+
+# Testing
 .vscode-test/
+
+# Yarn state
+.yarn/install-state.gz
+.yarn/build-state.yml

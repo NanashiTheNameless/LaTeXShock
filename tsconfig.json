@@ -3,8 +3,11 @@
     "module": "commonjs",
     "target": "ES2021",
     "lib": [
-      "ES2021"
+      "ES2021",
+      "DOM",
+      "DOM.Iterable"
     ],
+    "types": ["node"],
     "outDir": "out",
     "rootDir": "src",
     "sourceMap": true,

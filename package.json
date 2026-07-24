@@ -1,4 +1,347 @@
 {
-  "name": "LaTeXShock",
-  "packageManager": "yarn@4.12.0"
+  "name": "latexshock",
+  "displayName": "LaTeXShock",
+  "description": "Triggers an OpenShock shocker based on LaTeX (and general Problems-panel) compile results. Intensity and duration reflect how badly the compile went.",
+  "version": "0.1.0",
+  "license": "WTFPL",
+  "publisher": "namelessnanashi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NanashiTheNameless/LaTeXShock.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "latex",
+    "openshock",
+    "diagnostics",
+    "compile"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "latexShock.setToken",
+        "title": "LaTeXShock: Set OpenShock API Token"
+      },
+      {
+        "command": "latexShock.clearToken",
+        "title": "LaTeXShock: Clear OpenShock API Token"
+      },
+      {
+        "command": "latexShock.testShock",
+        "title": "LaTeXShock: Send Test Shock (minimum settings)"
+      },
+      {
+        "command": "latexShock.enable",
+        "title": "LaTeXShock: Enable"
+      },
+      {
+        "command": "latexShock.disable",
+        "title": "LaTeXShock: Disable"
+      },
+      {
+        "command": "latexShock.showOutput",
+        "title": "LaTeXShock: Show Log"
+      }
+    ],
+    "configuration": {
+      "title": "LaTeXShock",
+      "properties": {
+        "latexShock.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Master switch. When off, no shocks are ever sent. Defaults to off so nothing happens until you opt in."
+        },
+        "latexShock.dryRun": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "When on, compute and log what would be sent but never contact the OpenShock API. Useful for tuning weights and curves safely."
+        },
+        "latexShock.mode": {
+          "type": "string",
+          "enum": [
+            "scaled",
+            "pulses"
+          ],
+          "enumDescriptions": [
+            "One shock per dirty compile, with intensity/duration scaled by the weighted severity score.",
+            "One short pulse per issue (capped at pulses.maxCount), spaced by at least the safety cooldown."
+          ],
+          "default": "scaled",
+          "scope": "application",
+          "description": "How a 'compiled but dirty' result is delivered. Compile failures are always a single binary shock regardless of this setting."
+        },
+        "latexShock.connection.apiBaseUrl": {
+          "type": "string",
+          "default": "https://api.openshock.app",
+          "scope": "application",
+          "description": "Base URL of the OpenShock API (or a self-hosted instance)."
+        },
+        "latexShock.connection.shockerId": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "The OpenShock shocker ID to activate. The API token is stored separately via the 'LaTeXShock: Set OpenShock API Token' command, not in settings."
+        },
+        "latexShock.build.taskFilter": {
+          "type": "string",
+          "default": "latex",
+          "scope": "application",
+          "description": "Case-insensitive regex matched against a finished task's name, source, and type to decide whether its exit code counts as a LaTeX build. A non-zero exit from a matching task is treated as a compile failure."
+        },
+        "latexShock.diagnostics.source": {
+          "type": "string",
+          "enum": [
+            "diagnostics",
+            "log",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "Use the VS Code Problems panel (works with LaTeX Workshop and any linter).",
+            "Parse a LaTeX .log file directly; skip if none is found.",
+            "Parse a .log file if one can be found, otherwise fall back to diagnostics."
+          ],
+          "default": "diagnostics",
+          "scope": "application",
+          "description": "Where 'compiled but dirty' issue counts come from."
+        },
+        "latexShock.diagnostics.logPath": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "Explicit path to the LaTeX .log file to parse when diagnostics.source is 'log' or 'auto'. Supports ${workspaceFolder}. When empty, LaTeXShock looks next to the active document, then for the most recently modified *.log in the workspace."
+        },
+        "latexShock.triggers.compileFailure": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Shock on a hard compile failure (build task exits non-zero / no PDF produced)."
+        },
+        "latexShock.triggers.undefinedReferences": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Count undefined references/citations toward the severity score."
+        },
+        "latexShock.triggers.overfullHbox": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Count overfull hbox warnings toward the severity score."
+        },
+        "latexShock.triggers.underfullHbox": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Count underfull hbox warnings toward the severity score."
+        },
+        "latexShock.triggers.packageWarnings": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Count package / generic LaTeX warnings toward the severity score."
+        },
+        "latexShock.triggers.fontWarnings": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Count font warnings toward the severity score."
+        },
+        "latexShock.weights.compileFailure": {
+          "type": "number",
+          "default": 100,
+          "scope": "application",
+          "description": "Severity contribution of a compile failure (used for scaling; failures also honor power.failureOverride)."
+        },
+        "latexShock.weights.undefinedReference": {
+          "type": "number",
+          "default": 15,
+          "scope": "application",
+          "description": "Severity contribution per undefined reference/citation."
+        },
+        "latexShock.weights.overfullHbox": {
+          "type": "number",
+          "default": 3,
+          "scope": "application",
+          "description": "Severity contribution per overfull hbox."
+        },
+        "latexShock.weights.underfullHbox": {
+          "type": "number",
+          "default": 2,
+          "scope": "application",
+          "description": "Severity contribution per underfull hbox."
+        },
+        "latexShock.weights.packageWarning": {
+          "type": "number",
+          "default": 5,
+          "scope": "application",
+          "description": "Severity contribution per package / generic warning."
+        },
+        "latexShock.weights.fontWarning": {
+          "type": "number",
+          "default": 2,
+          "scope": "application",
+          "description": "Severity contribution per font warning."
+        },
+        "latexShock.power.min": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "application",
+          "description": "Minimum shock intensity (0-100) for a scaled 'compiled but dirty' event."
+        },
+        "latexShock.power.max": {
+          "type": "number",
+          "default": 80,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "application",
+          "description": "Maximum shock intensity (0-100) for a scaled 'compiled but dirty' event, before the safety ceiling."
+        },
+        "latexShock.power.failureOverride": {
+          "type": "number",
+          "default": 100,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "application",
+          "description": "Intensity used for a hard compile failure. A failure is a binary event and always uses this value (still clamped by the safety ceiling)."
+        },
+        "latexShock.duration.minMs": {
+          "type": "number",
+          "default": 500,
+          "minimum": 300,
+          "maximum": 30000,
+          "scope": "application",
+          "description": "Minimum shock duration in milliseconds for a scaled event."
+        },
+        "latexShock.duration.maxMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 300,
+          "maximum": 30000,
+          "scope": "application",
+          "description": "Maximum shock duration in milliseconds for a scaled event."
+        },
+        "latexShock.duration.failureMs": {
+          "type": "number",
+          "default": 3000,
+          "minimum": 300,
+          "maximum": 30000,
+          "scope": "application",
+          "description": "Duration in milliseconds for a hard compile failure."
+        },
+        "latexShock.scaling.curve": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "logarithmic",
+            "exponential",
+            "stepped"
+          ],
+          "default": "linear",
+          "scope": "application",
+          "description": "How the weighted severity score maps to output. linear: proportional. logarithmic: diminishing returns for piling up errors. exponential: punishes piling up harder. stepped: discrete tiers (see scaling.stepThresholds)."
+        },
+        "latexShock.scaling.target": {
+          "type": "string",
+          "enum": [
+            "power",
+            "duration",
+            "both"
+          ],
+          "default": "power",
+          "scope": "application",
+          "description": "Which dimension the severity score scales. The non-scaled dimension is held at its configured minimum."
+        },
+        "latexShock.scaling.referenceScore": {
+          "type": "number",
+          "default": 100,
+          "minimum": 1,
+          "scope": "application",
+          "description": "The weighted severity score at which scaled output saturates to its maximum. Lower values make the extension reach max intensity/duration sooner."
+        },
+        "latexShock.scaling.stepThresholds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "default": [
+            1,
+            3,
+            6,
+            10
+          ],
+          "scope": "application",
+          "description": "Weighted-score thresholds defining tiers when scaling.curve is 'stepped'. Each threshold crossed moves output one tier higher between min and max."
+        },
+        "latexShock.pulses.intensity": {
+          "type": "number",
+          "default": 20,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "application",
+          "description": "Intensity (0-100) of each pulse when mode is 'pulses'. Clamped by safety.hardMaxPower."
+        },
+        "latexShock.pulses.durationMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 300,
+          "maximum": 30000,
+          "scope": "application",
+          "description": "Duration in milliseconds of each pulse when mode is 'pulses'."
+        },
+        "latexShock.pulses.maxCount": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "scope": "application",
+          "description": "Maximum number of pulses emitted for a single dirty compile when mode is 'pulses'."
+        },
+        "latexShock.pulses.spacingMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 0,
+          "scope": "application",
+          "description": "Requested gap in milliseconds between pulses when mode is 'pulses'. The effective gap is never smaller than safety.cooldownMs."
+        },
+        "latexShock.safety.hardMaxPower": {
+          "type": "number",
+          "default": 100,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "application",
+          "description": "Absolute intensity ceiling enforced regardless of any other setting."
+        },
+        "latexShock.safety.cooldownMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 0,
+          "scope": "application",
+          "description": "Minimum time in milliseconds between activations. Shocks requested during the cooldown window are dropped, never queued."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "yarn compile && node --test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/vscode": "^1.125.0",
+    "typescript": "^7.0.2"
+  }
 }
