@@ -3,6 +3,7 @@ import { readConfig } from './config';
 import { Controller, TOKEN_KEY } from './controller';
 import { Logger } from './logger';
 import { resolveCounts } from './logsource';
+import * as fmt from './format';
 
 /**
  * Debounce window for diagnostic-driven evaluation. LaTeX Workshop (and most
@@ -14,20 +15,20 @@ const DIAGNOSTIC_DEBOUNCE_MS = 1500;
 export function activate(context: vscode.ExtensionContext): void {
   const log = new Logger(context.logUri);
   const controller = new Controller(context.secrets, log);
-  log.appendLine('LaTeXShock activated.');
+  log.info(fmt.event('startup', `LaTeXShock activated · enabled=${readConfig().enabled}`));
   if (log.filePath) {
-    log.appendLine(`[log] writing to ${log.filePath}`);
+    log.info(fmt.event('startup', `logging to ${log.filePath}`));
   }
 
   const evaluateDirty = async (force: boolean) => {
     const cfg = readConfig();
     const resolved = await resolveCounts(cfg);
     if (resolved.kind === 'skip') {
-      log.appendLine(`[dirty] skipped: ${resolved.reason}`);
+      log.debug(fmt.event('dirty', `skipped · ${resolved.reason}`));
       return;
     }
     if (resolved.kind === 'counts') {
-      log.appendLine(`[dirty] using parsed log: ${resolved.from}`);
+      log.debug(fmt.event('dirty', `parsed log · ${resolved.from}`));
       await controller.onDirtyCompile(resolved.counts, { force });
     } else {
       await controller.onDirtyCompile(undefined, { force });
@@ -63,10 +64,12 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     const code = event.exitCode ?? 0;
     if (code !== 0) {
-      log.appendLine(`[task] "${event.execution.task.name}" exited ${code} -> failure`);
+      log.warn(fmt.event('task', `"${event.execution.task.name}" exited ${code} → compile failure`));
       void controller.onCompileFailure();
     } else {
-      log.appendLine(`[task] "${event.execution.task.name}" exited 0 -> evaluate diagnostics`);
+      log.info(
+        fmt.event('task', `"${event.execution.task.name}" exited 0 → evaluating diagnostics`),
+      );
       // Give the build's diagnostics a moment to land before scoring.
       scheduleDirtyEvaluation(true);
     }
@@ -129,13 +132,13 @@ async function setToken(context: vscode.ExtensionContext, log: Logger): Promise<
     return;
   }
   await context.secrets.store(TOKEN_KEY, token.trim());
-  log.appendLine('[token] stored');
+  log.info(fmt.event('token', 'stored'));
   void vscode.window.showInformationMessage('LaTeXShock: OpenShock API token saved.');
 }
 
 async function clearToken(context: vscode.ExtensionContext, log: Logger): Promise<void> {
   await context.secrets.delete(TOKEN_KEY);
-  log.appendLine('[token] cleared');
+  log.info(fmt.event('token', 'cleared'));
   void vscode.window.showInformationMessage('LaTeXShock: OpenShock API token cleared.');
 }
 

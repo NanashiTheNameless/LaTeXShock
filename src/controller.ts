@@ -4,6 +4,7 @@ import { IssueCounts, tally, latexDiagnosticUris } from './classify';
 import { planDirty, planFailure, pulseCount, ShockPlan } from './scoring';
 import { OpenShockClient, OpenShockError } from './openshock';
 import { Logger } from './logger';
+import * as fmt from './format';
 
 export const TOKEN_KEY = 'latexShock.openShockToken';
 
@@ -48,7 +49,7 @@ export class Controller {
       return;
     }
     if (!cfg.triggers.compileFailure) {
-      this.log.appendLine('[failure] ignored: triggers.compileFailure is off');
+      this.log.debug(fmt.event('failure', 'ignored · triggers.compileFailure is off'));
       return;
     }
     await this.dispatch(planFailure(cfg), cfg.dryRun, cfg.connection, cfg.safety.cooldownMs);
@@ -73,7 +74,7 @@ export class Controller {
 
     const signature = JSON.stringify(resolved);
     if (!options?.force && signature === this.lastDirtySignature) {
-      this.log.appendLine('[dirty] counts unchanged since the last evaluation; skipping');
+      this.log.debug(fmt.event('dirty', 'skipped · counts unchanged since the last evaluation'));
       return;
     }
     this.lastDirtySignature = signature;
@@ -85,11 +86,12 @@ export class Controller {
 
     const plan = planDirty(resolved, cfg);
     if (!plan) {
-      this.log.appendLine('[dirty] no scorable issues; nothing to do');
+      this.log.debug(fmt.event('dirty', 'nothing to do · no scorable issues'));
       return;
     }
-    this.log.appendLine(
-      `[dirty] counts=${JSON.stringify(resolved)} -> power=${plan.power} duration=${plan.durationMs}ms`,
+    this.log.info(fmt.event('dirty', fmt.counts(resolved)));
+    this.log.info(
+      fmt.event('plan', `score ${plan.score} → ${fmt.output(plan.power, plan.durationMs)}`),
     );
     await this.dispatch(plan, cfg.dryRun, cfg.connection, cfg.safety.cooldownMs);
   }
@@ -102,18 +104,22 @@ export class Controller {
   private async runPulses(counts: IssueCounts, cfg: LatexShockConfig): Promise<void> {
     const count = pulseCount(counts, cfg);
     if (count <= 0) {
-      this.log.appendLine('[pulses] no scorable issues; nothing to do');
+      this.log.debug(fmt.event('pulses', 'nothing to do · no scorable issues'));
       return;
     }
     if (this.pulseRunning) {
-      this.log.appendLine('[pulses] a pulse batch is already running; skipping');
+      this.log.warn(fmt.event('pulses', 'skipped · a pulse batch is already running'));
       return;
     }
 
     const spacing = Math.max(cfg.pulses.spacingMs, cfg.safety.cooldownMs);
     const power = Math.min(cfg.pulses.intensity, cfg.safety.hardMaxPower);
-    this.log.appendLine(
-      `[pulses] ${count} pulse(s) at power=${power} duration=${cfg.pulses.durationMs}ms spacing=${spacing}ms`,
+    this.log.info(fmt.event('pulses', fmt.counts(counts)));
+    this.log.info(
+      fmt.event(
+        'plan',
+        `${count} × ${fmt.output(power, cfg.pulses.durationMs)} · every ${fmt.duration(spacing)}`,
+      ),
     );
 
     this.pulseRunning = true;
@@ -146,7 +152,7 @@ export class Controller {
   async onTestShock(): Promise<void> {
     const cfg = readConfig();
     if (!cfg.enabled) {
-      this.log.appendLine('[test] latexShock.enabled is off, but a test shock was requested');
+      this.log.warn(fmt.event('test', 'latexShock.enabled is off, but a test shock was requested'));
     }
     const plan: ShockPlan = {
       power: Math.min(TEST_SHOCK_POWER, cfg.safety.hardMaxPower),
@@ -159,7 +165,7 @@ export class Controller {
 
   private gate(enabled: boolean): boolean {
     if (!enabled) {
-      this.log.appendLine('[gate] latexShock.enabled is off; skipping');
+      this.log.debug(fmt.event('gate', 'skipped · latexShock.enabled is off'));
       return false;
     }
     return true;
@@ -174,30 +180,40 @@ export class Controller {
     const now = Date.now();
     const sinceLast = now - this.lastActivation;
     if (sinceLast < cooldownMs) {
-      this.log.appendLine(
-        `[cooldown] dropped (${sinceLast}ms since last, need ${cooldownMs}ms): ${plan.reason}`,
+      this.log.warn(
+        fmt.event(
+          'cooldown',
+          `dropped · ${fmt.duration(sinceLast)} since last, need ${fmt.duration(cooldownMs)} · ${plan.reason}`,
+        ),
       );
       return;
     }
 
     if (dryRun) {
       this.lastActivation = now;
-      this.log.appendLine(
-        `[dry-run] would shock power=${plan.power} duration=${plan.durationMs}ms (${plan.reason})`,
+      this.log.info(
+        fmt.event(
+          'dry-run',
+          `would send · ${fmt.output(plan.power, plan.durationMs)} · ${plan.reason}`,
+        ),
       );
       return;
     }
 
     const token = await this.secrets.get(TOKEN_KEY);
     if (!token) {
-      this.log.appendLine('[error] no API token set; run "LaTeXShock: Set OpenShock API Token"');
+      this.log.error(
+        fmt.event('error', 'no API token set · run "LaTeXShock: Set OpenShock API Token"'),
+      );
       void vscode.window.showWarningMessage(
         'LaTeXShock: no OpenShock API token is set. Run "LaTeXShock: Set OpenShock API Token".',
       );
       return;
     }
     if (!connection.shockerId) {
-      this.log.appendLine('[error] no shocker ID configured (latexShock.connection.shockerId)');
+      this.log.error(
+        fmt.event('error', 'no shocker ID configured · set latexShock.connection.shockerId'),
+      );
       void vscode.window.showWarningMessage(
         'LaTeXShock: no shocker ID is configured (latexShock.connection.shockerId).',
       );
@@ -214,12 +230,12 @@ export class Controller {
         intensity: plan.power,
         durationMs: plan.durationMs,
       });
-      this.log.appendLine(
-        `[shock] sent power=${plan.power} duration=${plan.durationMs}ms (${plan.reason})`,
+      this.log.info(
+        fmt.event('shock', `sent · ${fmt.output(plan.power, plan.durationMs)} · ${plan.reason}`),
       );
     } catch (err) {
       const msg = err instanceof OpenShockError ? err.message : String(err);
-      this.log.appendLine(`[error] ${msg}`);
+      this.log.error(fmt.event('error', msg));
       void vscode.window.showErrorMessage(`LaTeXShock: ${msg}`);
     }
   }

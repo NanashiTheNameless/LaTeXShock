@@ -227,6 +227,23 @@ The file survives a closed panel or a reloaded window, so what was actually sent
 to a real device stays auditable after the fact. VS Code allocates a fresh log
 directory per window session, so the file rotates on its own.
 
+Output is colorized by severity, and every line carries a padded event tag so
+the log reads as columns:
+
+```text
+2026-07-24 16:31:20.412 [info]  [task]     "latexmk" exited 0 → evaluating diagnostics
+2026-07-24 16:31:21.988 [info]  [dirty]    2 undefined refs · 3 package warnings
+2026-07-24 16:31:21.989 [info]  [plan]     score 45 → power 42 · 500ms
+2026-07-24 16:31:22.104 [info]  [shock]    sent · power 42 · 500ms · dirty compile
+2026-07-24 16:31:26.615 [warning] [cooldown] dropped · 4.5s since last, need 5s · dirty compile
+```
+
+Severity is what drives the color: sends and evaluations are `info`, suppressed
+activations and misconfiguration are `warning`, failed requests are `error`, and
+the "why did nothing happen" detail (unchanged counts, disabled triggers) is
+`debug`. Debug lines are hidden by default - raise the level via the gear icon
+in the Output view, or **Developer: Set Log Level…** in the Command Palette.
+
 ## Scaling
 
 The weighted score maps to output through `latexShock.scaling.curve`:
