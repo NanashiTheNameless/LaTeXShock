@@ -28,6 +28,13 @@ function delay(ms: number): Promise<void> {
 export class Controller {
   private lastActivation = 0;
   private pulseRunning = false;
+  /**
+   * Counts of the last dirty-compile evaluation, used to ignore repeat
+   * evaluations. Diagnostics are rewritten constantly (on save, on keystroke,
+   * whenever any linter re-runs), and without this an unchanged set of
+   * warnings shocks again every cooldown window.
+   */
+  private lastDirtySignature: string | undefined;
 
   constructor(
     private readonly secrets: vscode.SecretStorage,
@@ -51,13 +58,25 @@ export class Controller {
    * A compile that produced output but has diagnostics. Depending on
    * `latexShock.mode` this is either a single scaled shock or a sequence of
    * discrete pulses (one per issue, capped).
+   *
+   * Repeat evaluations that produce identical counts are ignored, so only a
+   * *change* in the problem set can shock. Pass `force` for an unambiguous new
+   * build result (a finished build task), which should fire even if the
+   * resulting counts happen to match the previous build's.
    */
-  async onDirtyCompile(counts?: IssueCounts): Promise<void> {
+  async onDirtyCompile(counts?: IssueCounts, options?: { force?: boolean }): Promise<void> {
     const cfg = readConfig();
     if (!this.gate(cfg.enabled)) {
       return;
     }
-    const resolved = counts ?? tally(latexDiagnosticUris());
+    const resolved = counts ?? tally(latexDiagnosticUris(cfg.diagnostics.includeNonLatexFiles));
+
+    const signature = JSON.stringify(resolved);
+    if (!options?.force && signature === this.lastDirtySignature) {
+      this.log.appendLine('[dirty] counts unchanged since the last evaluation; skipping');
+      return;
+    }
+    this.lastDirtySignature = signature;
 
     if (cfg.mode === 'pulses') {
       await this.runPulses(resolved, cfg);

@@ -126,6 +126,26 @@
           "scope": "application",
           "description": "Explicit path to the LaTeX .log file to parse when diagnostics.source is 'log' or 'auto'. Supports ${workspaceFolder}. When empty, LaTeXShock looks next to the active document, then for the most recently modified *.log in the workspace."
         },
+        "latexShock.diagnostics.evaluateOn": {
+          "type": "string",
+          "enum": [
+            "buildTask",
+            "anyChange"
+          ],
+          "enumDescriptions": [
+            "Only score diagnostics after a build task matching build.taskFilter finishes.",
+            "Also score diagnostics whenever they change, with no build task involved."
+          ],
+          "default": "buildTask",
+          "scope": "application",
+          "description": "When a 'compiled but dirty' evaluation may run. 'buildTask' ties shocks to actual builds. Use 'anyChange' only if your builder never runs as a VS Code task (e.g. LaTeX Workshop's internal build) - diagnostics change constantly while you type, so this can fire without you building anything."
+        },
+        "latexShock.diagnostics.includeNonLatexFiles": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Count diagnostics from files that aren't LaTeX sources (.tex/.ltx/.bib/.sty/.cls/.dtx/.ins). Enables the generalized 'any language in the Problems panel' use case, but lets unrelated linters anywhere in the workspace drive the shock."
+        },
         "latexShock.triggers.compileFailure": {
           "type": "boolean",
           "default": true,

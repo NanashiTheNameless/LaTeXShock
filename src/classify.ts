@@ -8,8 +8,10 @@ export { IssueCounts, emptyCounts } from './patterns';
  * Maps a single diagnostic message to a scalable issue category, or `null`
  * when it doesn't correspond to one we score.
  *
- * Any unmatched message at Warning severity or below is treated as a generic
- * package/LaTeX warning, since that is the broadest configured bucket.
+ * An unmatched message counts as a generic package/LaTeX warning only at
+ * `Warning` severity. `Information` and `Hint` are deliberately excluded:
+ * spell-checkers and style linters emit hints in bulk, and treating them as
+ * LaTeX warnings turns a tidy document into a high-intensity shock.
  */
 export function classify(
   message: string,
@@ -19,7 +21,7 @@ export function classify(
   if (matched) {
     return matched;
   }
-  if (severity !== vscode.DiagnosticSeverity.Error) {
+  if (severity === vscode.DiagnosticSeverity.Warning) {
     return 'packageWarnings';
   }
   return null;
@@ -43,18 +45,20 @@ export function tally(uris: readonly vscode.Uri[]): IssueCounts {
   return counts;
 }
 
+const LATEX_FILE_RE = /\.(tex|ltx|bib|sty|cls|dtx|ins)$/i;
+
 /**
- * Collects the URIs of diagnostics that belong to LaTeX-ish source files.
- * Falls back to every file that currently has diagnostics when nothing looks
- * LaTeX-specific, so non-LaTeX languages (the generalized use case) still work.
+ * Collects the URIs whose diagnostics should be scored.
+ *
+ * By default only LaTeX-ish source files count. Set `includeNonLatexFiles` to
+ * score every file that has diagnostics instead - that enables the generalized
+ * "any language whose tooling populates the Problems panel" use case, at the
+ * cost of letting an unrelated linter in the workspace drive the shock.
  */
-export function latexDiagnosticUris(): vscode.Uri[] {
-  const all = vscode.languages.getDiagnostics();
-  const latexLike = all
-    .filter(([uri]) => /\.(tex|ltx|bib|sty|cls|dtx|ins)$/i.test(uri.fsPath))
-    .map(([uri]) => uri);
-  if (latexLike.length > 0) {
-    return latexLike;
+export function latexDiagnosticUris(includeNonLatexFiles = false): vscode.Uri[] {
+  const withDiagnostics = vscode.languages.getDiagnostics().filter(([, diags]) => diags.length > 0);
+  if (includeNonLatexFiles) {
+    return withDiagnostics.map(([uri]) => uri);
   }
-  return all.filter(([, diags]) => diags.length > 0).map(([uri]) => uri);
+  return withDiagnostics.filter(([uri]) => LATEX_FILE_RE.test(uri.fsPath)).map(([uri]) => uri);
 }

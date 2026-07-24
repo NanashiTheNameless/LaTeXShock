@@ -32,7 +32,8 @@ compiled is a gentle nudge; a hard compile failure is the full jolt.
 
 Although it's framed around LaTeX, it's built on VS Code's diagnostics API and
 task exit codes rather than LaTeX-specific log parsing, so it works for any
-language whose tooling populates the Problems panel.
+language whose tooling populates the Problems panel - set
+`latexShock.diagnostics.includeNonLatexFiles` to opt into that.
 
 > ⚠️ This extension controls a real device that delivers physical stimulation.
 > It ships **disabled** and does nothing until you set `latexShock.enabled` to
@@ -66,8 +67,23 @@ Compile failures are always a single binary shock regardless of mode.
 - **Task exit codes** (`onDidEndTaskProcess`) detect hard failures. Only tasks
   whose name/source/type match `latexShock.build.taskFilter` (default `latex`)
   count.
-- **Diagnostics** (`onDidChangeDiagnostics`, e.g. from LaTeX Workshop) are
-  classified into issue categories and tallied for the scaled path.
+- **Diagnostics** (e.g. from LaTeX Workshop) are classified into issue
+  categories and tallied for the scaled path. Three rules keep this from
+  turning your editor into a shock collar:
+  - Only **`Error`** and **`Warning`** severities count. `Information` and
+    `Hint` are ignored, because spell-checkers and style linters emit those in
+    bulk - a document with 14 "Unknown word" hints is not a broken build.
+  - Only **LaTeX source files** count (`.tex`, `.ltx`, `.bib`, `.sty`, `.cls`,
+    `.dtx`, `.ins`), unless you set
+    `latexShock.diagnostics.includeNonLatexFiles`.
+  - Evaluation runs only after a **matching build task finishes**. Set
+    `latexShock.diagnostics.evaluateOn` to `anyChange` if your builder never
+    runs as a VS Code task (LaTeX Workshop's internal build, for instance) -
+    but be aware diagnostics change constantly as you type.
+
+  On top of that, an evaluation whose counts are **identical to the previous
+  one** is skipped, so a static set of warnings shocks once rather than every
+  cooldown window. A finished build task always counts as a new result.
 - **Manual `.log` parsing** is available as an alternative via
   `latexShock.diagnostics.source`:
   - `diagnostics` (default) - use the Problems panel.
@@ -89,6 +105,16 @@ This extension is not on the Marketplace; install the `.vsix` directly.
 - **Nightly (Rolling) release** (recommended) - grab the latest `.vsix` from the
   [Nightly (Rolling)](https://github.com/NanashiTheNameless/LaTeXShock/releases/tag/Nightly-Rolling)
   release. Every push to `main` rebuilds and refreshes it automatically.
+
+  That release also carries **`latexshock-latest.vsix`**, a stable filename that
+  always holds the newest build, so this URL never changes:
+
+  ```sh
+  curl -LO https://github.com/NanashiTheNameless/LaTeXShock/releases/download/Nightly-Rolling/latexshock-latest.vsix
+  ```
+
+  The timestamped `latexshock-<date>.vsix` assets alongside it are the previous
+  few builds, kept for rollback.
 - **Per-PR artifact** - CI attaches the built `.vsix` as an artifact to each
   pull request, under the run's **Artifacts** section.
 - **Build it yourself** - see [Development](#development) below.
@@ -206,11 +232,11 @@ directory per window session, so the file rotates on its own.
 The weighted score maps to output through `latexShock.scaling.curve`:
 
 | Curve         | Behavior                                                        |
-| ------------- | -------------------------------------------------------------- |
-| `linear`      | Output proportional to the score (up to `referenceScore`).     |
-| `logarithmic` | Diminishing returns - early errors matter more than later ones.|
-| `exponential` | Punishes piling up harder than a single mistake.               |
-| `stepped`     | Discrete tiers defined by `scaling.stepThresholds`.            |
+| ------------- | --------------------------------------------------------------- |
+| `linear`      | Output proportional to the score (up to `referenceScore`).      |
+| `logarithmic` | Diminishing returns - early errors matter more than later ones. |
+| `exponential` | Punishes piling up harder than a single mistake.                |
+| `stepped`     | Discrete tiers defined by `scaling.stepThresholds`.             |
 
 `scaling.target` chooses whether the score scales `power`, `duration`, or
 `both`. The non-scaled dimension is held at its configured minimum, so you

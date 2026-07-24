@@ -9,6 +9,14 @@ on:
 permissions:
   contents: read
 
+# Serialize runs per ref: a queued run waits for the one ahead of it instead of
+# starting alongside it, so the rolling release is always published in commit
+# order. cancel-in-progress stays false - cancelling would let a later commit's
+# release overtake an earlier one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -77,9 +85,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # Guards the release against concurrent writes from any other ref's run.
+    # Also non-cancelling, for the same ordering reason as the workflow group.
     concurrency:
       group: nightly-rolling
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
 
@@ -117,3 +127,14 @@ jobs:
           asset_content_type: application/octet-stream
           max_releases: 4
           token: ${{ github.token }}
+
+      # A stable filename that always holds the newest build, so the download
+      # URL never changes. Uploaded *after* deploy-nightly, which prunes old
+      # timestamped assets - running last means this is restored every time
+      # even if that pruning ever catches it.
+      - name: Publish rolling latexshock-latest.vsix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp latexshock.vsix latexshock-latest.vsix
+          gh release upload Nightly-Rolling latexshock-latest.vsix --clobber

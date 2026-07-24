@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext): void {
     log.appendLine(`[log] writing to ${log.filePath}`);
   }
 
-  const evaluateDirty = async () => {
+  const evaluateDirty = async (force: boolean) => {
     const cfg = readConfig();
     const resolved = await resolveCounts(cfg);
     if (resolved.kind === 'skip') {
@@ -28,20 +28,26 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     if (resolved.kind === 'counts') {
       log.appendLine(`[dirty] using parsed log: ${resolved.from}`);
-      await controller.onDirtyCompile(resolved.counts);
+      await controller.onDirtyCompile(resolved.counts, { force });
     } else {
-      await controller.onDirtyCompile();
+      await controller.onDirtyCompile(undefined, { force });
     }
   };
 
   let debounceTimer: NodeJS.Timeout | undefined;
-  const scheduleDirtyEvaluation = () => {
+  // A build task finishing is an unambiguous new result; if one lands while a
+  // diagnostics-driven evaluation is still pending, the batch counts as forced.
+  let pendingForce = false;
+  const scheduleDirtyEvaluation = (force: boolean) => {
+    pendingForce = pendingForce || force;
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
     debounceTimer = setTimeout(() => {
       debounceTimer = undefined;
-      void evaluateDirty();
+      const forced = pendingForce;
+      pendingForce = false;
+      void evaluateDirty(forced);
     }, DIAGNOSTIC_DEBOUNCE_MS);
   };
 
@@ -62,18 +68,20 @@ export function activate(context: vscode.ExtensionContext): void {
     } else {
       log.appendLine(`[task] "${event.execution.task.name}" exited 0 -> evaluate diagnostics`);
       // Give the build's diagnostics a moment to land before scoring.
-      scheduleDirtyEvaluation();
+      scheduleDirtyEvaluation(true);
     }
   });
 
   // 2. Fallback for tools that don't run as VS Code tasks (e.g. LaTeX
   //    Workshop's internal build): react to diagnostic changes directly.
+  //    Off by default - diagnostics churn constantly while you type, and any
+  //    linter in the workspace can move them, so this is opt-in.
   const diagnosticsListener = vscode.languages.onDidChangeDiagnostics(() => {
     const cfg = readConfig();
-    if (!cfg.enabled) {
+    if (!cfg.enabled || cfg.diagnostics.evaluateOn !== 'anyChange') {
       return;
     }
-    scheduleDirtyEvaluation();
+    scheduleDirtyEvaluation(false);
   });
 
   context.subscriptions.push(

@@ -16,6 +16,14 @@ export type ScalingTarget = 'power' | 'duration' | 'both';
 export type ReactionMode = 'scaled' | 'pulses';
 export type DiagnosticsSource = 'diagnostics' | 'log' | 'auto';
 
+/**
+ * When a "compiled but dirty" evaluation is allowed to run.
+ * `buildTask` only reacts after a matching build task finishes; `anyChange`
+ * also reacts to bare diagnostic updates (needed for builders that never run
+ * as a VS Code task, e.g. LaTeX Workshop's internal build).
+ */
+export type DiagnosticsTrigger = 'buildTask' | 'anyChange';
+
 export interface LatexShockConfig {
   enabled: boolean;
   dryRun: boolean;
@@ -30,6 +38,8 @@ export interface LatexShockConfig {
   diagnostics: {
     source: DiagnosticsSource;
     logPath: string;
+    evaluateOn: DiagnosticsTrigger;
+    includeNonLatexFiles: boolean;
   };
   triggers: {
     compileFailure: boolean;
@@ -98,6 +108,8 @@ export function readConfig(): LatexShockConfig {
     diagnostics: {
       source: c.get<DiagnosticsSource>('diagnostics.source', 'diagnostics'),
       logPath: c.get<string>('diagnostics.logPath', ''),
+      evaluateOn: c.get<DiagnosticsTrigger>('diagnostics.evaluateOn', 'buildTask'),
+      includeNonLatexFiles: c.get<boolean>('diagnostics.includeNonLatexFiles', false),
     },
     triggers: {
       compileFailure: c.get<boolean>('triggers.compileFailure', true),
