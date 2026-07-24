@@ -1,5 +1,5 @@
 import { LatexShockConfig } from './config';
-import { IssueCounts } from './patterns';
+import { CATEGORIES, IssueCounts } from './patterns';
 
 export interface ShockPlan {
   /** Final intensity, 0-100, after curve, bounds and the safety ceiling. */
@@ -24,23 +24,11 @@ function clamp(value: number, min: number, max: number): number {
  * are enabled. Disabled categories contribute nothing.
  */
 export function weightedScore(counts: IssueCounts, cfg: LatexShockConfig): number {
-  const t = cfg.triggers;
-  const w = cfg.weights;
   let score = 0;
-  if (t.undefinedReferences) {
-    score += counts.undefinedReferences * w.undefinedReference;
-  }
-  if (t.overfullHbox) {
-    score += counts.overfullHbox * w.overfullHbox;
-  }
-  if (t.underfullHbox) {
-    score += counts.underfullHbox * w.underfullHbox;
-  }
-  if (t.packageWarnings) {
-    score += counts.packageWarnings * w.packageWarning;
-  }
-  if (t.fontWarnings) {
-    score += counts.fontWarnings * w.fontWarning;
+  for (const { category, weightKey } of CATEGORIES) {
+    if (cfg.triggers[category]) {
+      score += counts[category] * cfg.weights[weightKey];
+    }
   }
   return score;
 }
@@ -50,22 +38,11 @@ export function weightedScore(counts: IssueCounts, cfg: LatexShockConfig): numbe
  * the sequenced-pulse mode to decide how many discrete pulses to emit.
  */
 export function enabledIssueCount(counts: IssueCounts, cfg: LatexShockConfig): number {
-  const t = cfg.triggers;
   let n = 0;
-  if (t.undefinedReferences) {
-    n += counts.undefinedReferences;
-  }
-  if (t.overfullHbox) {
-    n += counts.overfullHbox;
-  }
-  if (t.underfullHbox) {
-    n += counts.underfullHbox;
-  }
-  if (t.packageWarnings) {
-    n += counts.packageWarnings;
-  }
-  if (t.fontWarnings) {
-    n += counts.fontWarnings;
+  for (const { category } of CATEGORIES) {
+    if (cfg.triggers[category]) {
+      n += counts[category];
+    }
   }
   return n;
 }

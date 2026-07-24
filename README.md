@@ -26,6 +26,8 @@
 > You have been warned: snarkily, but with genuine affection for your continued
 > and fully-conscious existence.
 
+[![Open VSX](https://img.shields.io/open-vsx/v/namelessnanashi/latexshock?label=Open%20VSX)](https://open-vsx.org/extension/namelessnanashi/latexshock)
+
 A VS Code / VSCodium extension that triggers an [OpenShock](https://openshock.app)
 shocker based on how badly your LaTeX build went. A light warning that still
 compiled is a gentle nudge; a hard compile failure is the full jolt.
@@ -98,9 +100,60 @@ Compile failures are always a single binary shock regardless of mode.
 
 ## Install
 
-This extension is not on the Marketplace; install the `.vsix` directly.
+### From Open VSX (recommended)
 
-### Get the `.vsix`
+Published to [Open VSX](https://open-vsx.org/extension/namelessnanashi/latexshock),
+so VSCodium and other Open VSX editors can install it directly and keep it
+**auto-updated** - a hand-installed `.vsix` never updates itself.
+
+- **In the editor:** open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`),
+  search `LaTeXShock`, and click **Install**.
+- **From the command line (VSCodium):**
+
+  ```sh
+  codium --install-extension namelessnanashi.latexshock
+  ```
+
+Then continue to [Setup](#setup) - the extension ships **disabled** and does
+nothing until you configure and enable it.
+
+#### Using Open VSX on Microsoft VS Code
+
+Stock VS Code ships pointed at the Microsoft Marketplace and has no setting to
+change that, so it won't see Open VSX - or auto-update from it - until you
+repoint its extension gallery. This is an edit to VS Code's own `product.json`;
+it's **unofficial, applies per-install, and is overwritten every time VS Code
+updates**, so you'd redo it after each update. If that's more than you want,
+just install the [`.vsix`](#from-a-vsix) instead.
+
+1. Fully quit VS Code.
+2. Open `product.json` in the installation directory (not your user settings):
+   - **Windows:** `C:\Users\<you>\AppData\Local\Programs\Microsoft VS Code\resources\app\product.json`
+   - **macOS:** `/Applications/Visual Studio Code.app/Contents/Resources/app/product.json`
+   - **Linux:** `/usr/share/code/resources/app/product.json` (varies by package)
+3. Add (or replace) the `extensionsGallery` block:
+
+   ```json
+   "extensionsGallery": {
+     "serviceUrl": "https://open-vsx.org/vscode/gallery",
+     "itemUrl": "https://open-vsx.org/vscode/item"
+   }
+   ```
+
+4. Save (you may need admin/root to write the file) and reopen VS Code. The
+   Extensions view now searches Open VSX, and this extension installs and
+   auto-updates like any other.
+
+To undo it, restore the original `extensionsGallery` values (or reinstall VS
+Code). Editing `product.json` also breaks Marketplace-only extensions while it's
+in effect, since the two galleries don't share a catalog.
+
+### From a `.vsix`
+
+Install the packaged extension directly - useful on Microsoft VS Code, for a
+specific build, or for testing a PR.
+
+#### Get the `.vsix`
 
 - **Nightly (Rolling) release** (recommended) - grab the latest `.vsix` from the
   [Nightly (Rolling)](https://github.com/NanashiTheNameless/LaTeXShock/releases/tag/Nightly-Rolling)
@@ -119,7 +172,7 @@ This extension is not on the Marketplace; install the `.vsix` directly.
   pull request, under the run's **Artifacts** section.
 - **Build it yourself** - see [Development](#development) below.
 
-### Install the `.vsix`
+#### Install the `.vsix`
 
 **From the UI:**
 

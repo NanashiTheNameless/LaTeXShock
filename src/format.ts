@@ -1,20 +1,9 @@
-import { IssueCategory } from './config';
-import { IssueCounts } from './patterns';
+import { CATEGORIES, IssueCounts } from './patterns';
 
 /**
  * Presentation helpers for the log. Kept free of any `vscode` import so they
  * can be exercised by the plain-Node unit tests.
  */
-
-const CATEGORY_LABELS: Record<IssueCategory, string> = {
-  undefinedReferences: 'undefined refs',
-  overfullHbox: 'overfull hbox',
-  underfullHbox: 'underfull hbox',
-  packageWarnings: 'package warnings',
-  fontWarnings: 'font warnings',
-};
-
-const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as IssueCategory[];
 
 /** Width of the `[tag]` column, so message text lines up down the log. */
 const TAG_WIDTH = 10;
@@ -32,8 +21,8 @@ export function event(tag: string, message: string): string {
  * so a single warning doesn't print four zeroes alongside it.
  */
 export function counts(value: IssueCounts): string {
-  const parts = CATEGORY_ORDER.filter((key) => value[key] > 0).map(
-    (key) => `${value[key]} ${CATEGORY_LABELS[key]}`,
+  const parts = CATEGORIES.filter(({ category }) => value[category] > 0).map(
+    ({ category, label }) => `${value[category]} ${label}`,
   );
   return parts.length > 0 ? parts.join(' · ') : 'no scorable issues';
 }

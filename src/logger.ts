@@ -4,6 +4,18 @@ import * as path from 'path';
 
 type Level = 'info' | 'warn' | 'error' | 'debug';
 
+/**
+ * The logging surface the rest of the extension depends on. Narrowing to this
+ * interface (rather than the concrete `Logger`) lets unit tests pass a plain
+ * capturing fake with no `vscode` or filesystem involved.
+ */
+export interface LogSink {
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+  debug(message: string): void;
+}
+
 /** Fixed-width level tags so the on-disk log keeps an aligned left column. */
 const FILE_LEVEL: Record<Level, string> = {
   debug: 'DEBUG',
@@ -27,7 +39,7 @@ const FILE_LEVEL: Record<Level, string> = {
  * VS Code gives each window session its own `logUri` directory, so the file
  * rotates naturally per session rather than growing without bound.
  */
-export class Logger implements vscode.Disposable {
+export class Logger implements vscode.Disposable, LogSink {
   private readonly channel: vscode.LogOutputChannel;
   private stream: fs.WriteStream | undefined;
 

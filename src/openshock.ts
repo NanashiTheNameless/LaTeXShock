@@ -17,7 +17,11 @@ export interface ShockRequest {
 export interface OpenShockClientOptions {
   baseUrl: string;
   token: string;
+  /** Abort the request after this many ms. Defaults to 10s. */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 10000;
 
 export class OpenShockError extends Error {
   constructor(
@@ -50,6 +54,7 @@ export class OpenShockClient {
       customName: 'LaTeXShock',
     };
 
+    const timeoutMs = this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     let response: Response;
     try {
       response = await fetch(url, {
@@ -60,8 +65,14 @@ export class OpenShockClient {
           OpenShockToken: this.options.token,
         },
         body: JSON.stringify(body),
+        // Without this a hung API leaves the request pending indefinitely,
+        // which also wedges the caller's already-reserved cooldown window.
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new OpenShockError(`OpenShock request timed out after ${timeoutMs}ms`);
+      }
       throw new OpenShockError(
         `Network error contacting OpenShock: ${err instanceof Error ? err.message : String(err)}`,
       );

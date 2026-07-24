@@ -75,6 +75,11 @@ async function findLogFile(configuredPath: string): Promise<string | undefined> 
   return findMostRecentLog();
 }
 
+// Banner a TeX engine writes near the top of its .log. Used to tell a real
+// LaTeX log apart from an unrelated one (npm-debug.log, a CI log, etc.) so the
+// workspace-wide search can't silently score garbage.
+const LATEX_LOG_BANNER = /This is (pdf|Xe|Lua)?TeX|LaTeX2e|entering extended mode/i;
+
 async function findMostRecentLog(): Promise<string | undefined> {
   const uris = await vscode.workspace.findFiles('**/*.log', '**/node_modules/**', 50);
   let best: { path: string; mtimeMs: number } | undefined;
@@ -84,7 +89,10 @@ async function findMostRecentLog(): Promise<string | undefined> {
     }
     try {
       const stat = await fs.stat(uri.fsPath);
-      if (!best || stat.mtimeMs > best.mtimeMs) {
+      if (best && stat.mtimeMs <= best.mtimeMs) {
+        continue;
+      }
+      if (await looksLikeLatexLog(uri.fsPath)) {
         best = { path: uri.fsPath, mtimeMs: stat.mtimeMs };
       }
     } catch {
@@ -92,6 +100,20 @@ async function findMostRecentLog(): Promise<string | undefined> {
     }
   }
   return best?.path;
+}
+
+/** Reads the head of a file and checks for a TeX-engine banner. */
+async function looksLikeLatexLog(filePath: string): Promise<boolean> {
+  let handle: fs.FileHandle | undefined;
+  try {
+    handle = await fs.open(filePath, 'r');
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(4096), 0, 4096, 0);
+    return LATEX_LOG_BANNER.test(buffer.subarray(0, bytesRead).toString('utf8'));
+  } catch {
+    return false;
+  } finally {
+    await handle?.close();
+  }
 }
 
 async function exists(p: string): Promise<boolean> {

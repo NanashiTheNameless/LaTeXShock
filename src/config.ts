@@ -1,15 +1,9 @@
 import * as vscode from 'vscode';
 
-/**
- * The issue categories that contribute to a scaled "compiled but dirty" score.
- * Compile failure is handled separately as a binary event.
- */
-export type IssueCategory =
-  | 'undefinedReferences'
-  | 'overfullHbox'
-  | 'underfullHbox'
-  | 'packageWarnings'
-  | 'fontWarnings';
+// The issue categories live in the vscode-free `patterns` module (the single
+// source of truth); re-exported here for the many call sites that import the
+// type from `config`.
+export type { IssueCategory } from './patterns';
 
 export type ScalingCurve = 'linear' | 'logarithmic' | 'exponential' | 'stepped';
 export type ScalingTarget = 'power' | 'duration' | 'both';

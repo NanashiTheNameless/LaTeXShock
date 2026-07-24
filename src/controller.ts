@@ -3,10 +3,36 @@ import { LatexShockConfig, readConfig } from './config';
 import { IssueCounts, tally, latexDiagnosticUris } from './classify';
 import { planDirty, planFailure, pulseCount, ShockPlan } from './scoring';
 import { OpenShockClient, OpenShockError } from './openshock';
-import { Logger } from './logger';
+import { LogSink } from './logger';
 import * as fmt from './format';
 
 export const TOKEN_KEY = 'latexShock.openShockToken';
+
+/**
+ * Sends a single activation to the device. Abstracted so tests can substitute
+ * a capturing fake instead of hitting the network, and so the cooldown/gate
+ * logic can be exercised without `vscode` or a real OpenShock endpoint.
+ */
+export type ShockSender = (req: {
+  baseUrl: string;
+  token: string;
+  shockerId: string;
+  intensity: number;
+  durationMs: number;
+}) => Promise<void>;
+
+/** Seams for testing: a clock and the device sender. */
+export interface ControllerDeps {
+  now?: () => number;
+  send?: ShockSender;
+}
+
+const defaultSender: ShockSender = (req) =>
+  new OpenShockClient({ baseUrl: req.baseUrl, token: req.token }).shock({
+    shockerId: req.shockerId,
+    intensity: req.intensity,
+    durationMs: req.durationMs,
+  });
 
 /**
  * Intensity and duration of the manual test shock. Fixed, not configurable:
@@ -36,11 +62,17 @@ export class Controller {
    * warnings shocks again every cooldown window.
    */
   private lastDirtySignature: string | undefined;
+  private readonly now: () => number;
+  private readonly send: ShockSender;
 
   constructor(
     private readonly secrets: vscode.SecretStorage,
-    private readonly log: Logger,
-  ) {}
+    private readonly log: LogSink,
+    deps: ControllerDeps = {},
+  ) {
+    this.now = deps.now ?? Date.now;
+    this.send = deps.send ?? defaultSender;
+  }
 
   /** A hard compile failure - binary event, uses the failure overrides. */
   async onCompileFailure(): Promise<void> {
@@ -177,7 +209,19 @@ export class Controller {
     connection: { apiBaseUrl: string; shockerId: string },
     cooldownMs: number,
   ): Promise<void> {
-    const now = Date.now();
+    // A plan clamped to zero intensity means the safety ceiling (or a min of 0)
+    // suppressed it entirely. Bail before anything is sent - the OpenShock
+    // client floors intensity at 1, so without this a hardMaxPower of 0 would
+    // still deliver a shock. Checked before the cooldown so a suppressed event
+    // doesn't consume the window.
+    if (plan.power <= 0) {
+      this.log.info(
+        fmt.event('skip', `nothing sent · intensity clamped to 0 by safety limits · ${plan.reason}`),
+      );
+      return;
+    }
+
+    const now = this.now();
     const sinceLast = now - this.lastActivation;
     if (sinceLast < cooldownMs) {
       this.log.warn(
@@ -223,9 +267,10 @@ export class Controller {
     // Reserve the cooldown window before the await so overlapping events can't
     // slip a second activation through while this request is in flight.
     this.lastActivation = now;
-    const client = new OpenShockClient({ baseUrl: connection.apiBaseUrl, token });
     try {
-      await client.shock({
+      await this.send({
+        baseUrl: connection.apiBaseUrl,
+        token,
         shockerId: connection.shockerId,
         intensity: plan.power,
         durationMs: plan.durationMs,

@@ -2,7 +2,7 @@
   "name": "latexshock",
   "displayName": "LaTeXShock",
   "description": "Triggers an OpenShock shocker based on LaTeX (and general Problems-panel) compile results. Intensity and duration reflect how badly the compile went.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "WTFPL",
   "publisher": "namelessnanashi",
   "repository": {
@@ -10,7 +10,7 @@
     "url": "https://github.com/NanashiTheNameless/LaTeXShock.git"
   },
   "engines": {
-    "vscode": "^1.125.0"
+    "vscode": "^1.105.0"
   },
   "packageManager": "yarn@4.17.1",
   "categories": [
@@ -367,7 +367,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "@types/vscode": "^1.125.0",
+    "@types/vscode": "^1.105.0",
     "typescript": "^7.0.2"
   }
 }

@@ -1,21 +1,54 @@
-import { IssueCategory } from './config';
+/**
+ * The issue categories that contribute to a scaled "compiled but dirty" score,
+ * and the single source of truth describing each one.
+ *
+ * This module is deliberately free of any `vscode` import so it can be reused
+ * by the log parser and exercised by plain-Node unit tests. Everything that
+ * needs to enumerate categories - scoring, formatting, tallying - iterates
+ * `CATEGORIES` rather than repeating the list, so adding a category is a single
+ * new entry here.
+ */
+export type IssueCategory =
+  | 'undefinedReferences'
+  | 'overfullHbox'
+  | 'underfullHbox'
+  | 'packageWarnings'
+  | 'fontWarnings';
+
+/** Config keys that select and weight a category, plus its display label. */
+export interface CategoryMeta {
+  /** Key into `IssueCounts` and `LatexShockConfig.triggers`. */
+  readonly category: IssueCategory;
+  /** Key into `LatexShockConfig.weights` (weights use singular-ish names). */
+  readonly weightKey:
+    | 'undefinedReference'
+    | 'overfullHbox'
+    | 'underfullHbox'
+    | 'packageWarning'
+    | 'fontWarning';
+  /** Human-readable label used in the log. */
+  readonly label: string;
+}
+
+export const CATEGORIES: readonly CategoryMeta[] = [
+  { category: 'undefinedReferences', weightKey: 'undefinedReference', label: 'undefined refs' },
+  { category: 'overfullHbox', weightKey: 'overfullHbox', label: 'overfull hbox' },
+  { category: 'underfullHbox', weightKey: 'underfullHbox', label: 'underfull hbox' },
+  { category: 'packageWarnings', weightKey: 'packageWarning', label: 'package warnings' },
+  { category: 'fontWarnings', weightKey: 'fontWarning', label: 'font warnings' },
+];
 
 /**
  * A tally of how many issues fell into each scalable category.
- *
- * This module is deliberately free of any `vscode` import so it can be reused
- * by the log parser and exercised by plain-Node unit tests.
  */
 export type IssueCounts = Record<IssueCategory, number>;
 
 export function emptyCounts(): IssueCounts {
-  return {
-    undefinedReferences: 0,
-    overfullHbox: 0,
-    underfullHbox: 0,
-    packageWarnings: 0,
-    fontWarnings: 0,
-  };
+  const counts = {} as IssueCounts;
+  for (const { category } of CATEGORIES) {
+    counts[category] = 0;
+  }
+  return counts;
 }
 
 export const PATTERNS: Array<{ category: IssueCategory; re: RegExp }> = [
@@ -45,11 +78,9 @@ export function matchCategory(message: string): IssueCategory | null {
 }
 
 export function totalIssues(counts: IssueCounts): number {
-  return (
-    counts.undefinedReferences +
-    counts.overfullHbox +
-    counts.underfullHbox +
-    counts.packageWarnings +
-    counts.fontWarnings
-  );
+  let total = 0;
+  for (const { category } of CATEGORIES) {
+    total += counts[category];
+  }
+  return total;
 }
