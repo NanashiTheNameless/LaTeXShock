@@ -2,7 +2,8 @@
 node_modules/
 .yarn/cache/
 .yarn/unplugged/
-.pnp*
+.pnp.cjs
+.pnp.loader.mjs
 
 # Build
 out/
