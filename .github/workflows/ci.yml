@@ -115,5 +115,5 @@ jobs:
           asset_path: ./latexshock.vsix
           asset_name: latexshock-$$.vsix
           asset_content_type: application/octet-stream
-          max_releases: 7
+          max_releases: 4
           token: ${{ github.token }}
