@@ -3,7 +3,7 @@
  *
  * Uses the v2 control endpoint (`POST /2/shockers/control`). Intensity is an
  * integer 1-100 and duration is milliseconds (the API accepts roughly
- * 300-30000ms). Authentication is via the `OpenShockToken` header.
+ * 300-65535ms). Authentication is via the `OpenShockToken` header.
  */
 
 export interface ShockRequest {
@@ -34,7 +34,7 @@ export class OpenShockClient {
 
   async shock(req: ShockRequest): Promise<void> {
     const intensity = Math.max(1, Math.min(100, Math.round(req.intensity)));
-    const duration = Math.max(300, Math.min(30000, Math.round(req.durationMs)));
+    const duration = Math.max(300, Math.min(65535, Math.round(req.durationMs)));
     const url = `${this.options.baseUrl.replace(/\/+$/, '')}/2/shockers/control`;
 
     const body = {

@@ -3,8 +3,18 @@ import { LatexShockConfig, readConfig } from './config';
 import { IssueCounts, tally, latexDiagnosticUris } from './classify';
 import { planDirty, planFailure, pulseCount, ShockPlan } from './scoring';
 import { OpenShockClient, OpenShockError } from './openshock';
+import { Logger } from './logger';
 
 export const TOKEN_KEY = 'latexShock.openShockToken';
+
+/**
+ * Intensity and duration of the manual test shock. Fixed, not configurable:
+ * the command exists to prove the connection works, so it must stay harmless
+ * no matter how the power and duration settings are tuned. 300 ms is the
+ * shortest duration OpenShock accepts.
+ */
+const TEST_SHOCK_POWER = 1;
+const TEST_SHOCK_DURATION_MS = 300;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,7 +31,7 @@ export class Controller {
 
   constructor(
     private readonly secrets: vscode.SecretStorage,
-    private readonly log: vscode.OutputChannel,
+    private readonly log: Logger,
   ) {}
 
   /** A hard compile failure - binary event, uses the failure overrides. */
@@ -106,15 +116,22 @@ export class Controller {
     }
   }
 
-  /** A manual, minimum-intensity test shock. Still respects the cooldown. */
+  /**
+   * A manual test shock, hard-coded to the lowest non-zero intensity and the
+   * shortest allowed duration so that "does my wiring work?" can never be
+   * answered painfully by misconfigured power/duration settings. Deliberately
+   * ignores `latexShock.enabled`: it is an explicit, user-initiated action, and
+   * the master switch exists to stop *automatic* shocks. Still respects
+   * dry-run, the cooldown, and the safety ceiling.
+   */
   async onTestShock(): Promise<void> {
     const cfg = readConfig();
-    if (!this.gate(cfg.enabled)) {
-      return;
+    if (!cfg.enabled) {
+      this.log.appendLine('[test] latexShock.enabled is off, but a test shock was requested');
     }
     const plan: ShockPlan = {
-      power: Math.min(cfg.power.min, cfg.safety.hardMaxPower),
-      durationMs: cfg.duration.minMs,
+      power: Math.min(TEST_SHOCK_POWER, cfg.safety.hardMaxPower),
+      durationMs: TEST_SHOCK_DURATION_MS,
       score: 0,
       reason: 'manual test shock',
     };

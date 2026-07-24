@@ -97,7 +97,7 @@ test('safety.hardMaxPower clamps computed power', () => {
 
 test('duration is clamped to the OpenShock-safe range', () => {
   const cfg = defaultConfig({ duration: { failureMs: 99999 } });
-  assert.equal(planFailure(cfg).durationMs, 30000);
+  assert.equal(planFailure(cfg).durationMs, 65535);
 });
 
 test('enabledIssueCount and pulseCount respect triggers and the cap', () => {

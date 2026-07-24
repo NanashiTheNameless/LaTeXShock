@@ -2,7 +2,7 @@
   "name": "latexshock",
   "displayName": "LaTeXShock",
   "description": "Triggers an OpenShock shocker based on LaTeX (and general Problems-panel) compile results. Intensity and duration reflect how badly the compile went.",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "license": "WTFPL",
   "publisher": "namelessnanashi",
   "repository": {
@@ -38,7 +38,7 @@
       },
       {
         "command": "latexShock.testShock",
-        "title": "LaTeXShock: Send Test Shock (minimum settings)"
+        "title": "LaTeXShock: Send Test Shock (power 1, 300ms, ignores enabled)"
       },
       {
         "command": "latexShock.enable",
@@ -51,6 +51,10 @@
       {
         "command": "latexShock.showOutput",
         "title": "LaTeXShock: Show Log"
+      },
+      {
+        "command": "latexShock.showLogFile",
+        "title": "LaTeXShock: Open Log File"
       }
     ],
     "configuration": {
@@ -222,7 +226,7 @@
           "type": "number",
           "default": 500,
           "minimum": 300,
-          "maximum": 30000,
+          "maximum": 65535,
           "scope": "application",
           "description": "Minimum shock duration in milliseconds for a scaled event."
         },
@@ -230,7 +234,7 @@
           "type": "number",
           "default": 5000,
           "minimum": 300,
-          "maximum": 30000,
+          "maximum": 65535,
           "scope": "application",
           "description": "Maximum shock duration in milliseconds for a scaled event."
         },
@@ -238,7 +242,7 @@
           "type": "number",
           "default": 3000,
           "minimum": 300,
-          "maximum": 30000,
+          "maximum": 65535,
           "scope": "application",
           "description": "Duration in milliseconds for a hard compile failure."
         },
@@ -298,7 +302,7 @@
           "type": "number",
           "default": 300,
           "minimum": 300,
-          "maximum": 30000,
+          "maximum": 65535,
           "scope": "application",
           "description": "Duration in milliseconds of each pulse when mode is 'pulses'."
         },

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { readConfig } from './config';
 import { Controller, TOKEN_KEY } from './controller';
+import { Logger } from './logger';
 import { resolveCounts } from './logsource';
 
 /**
@@ -11,9 +12,12 @@ import { resolveCounts } from './logsource';
 const DIAGNOSTIC_DEBOUNCE_MS = 1500;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const log = vscode.window.createOutputChannel('LaTeXShock');
+  const log = new Logger(context.logUri);
   const controller = new Controller(context.secrets, log);
   log.appendLine('LaTeXShock activated.');
+  if (log.filePath) {
+    log.appendLine(`[log] writing to ${log.filePath}`);
+  }
 
   const evaluateDirty = async () => {
     const cfg = readConfig();
@@ -82,6 +86,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('latexShock.enable', () => setEnabled(true)),
     vscode.commands.registerCommand('latexShock.disable', () => setEnabled(false)),
     vscode.commands.registerCommand('latexShock.showOutput', () => log.show()),
+    vscode.commands.registerCommand('latexShock.showLogFile', () => log.showFile()),
   );
 }
 
@@ -101,7 +106,7 @@ function taskMatches(task: vscode.Task, filter: string): boolean {
   return haystacks.some((h) => typeof h === 'string' && re.test(h));
 }
 
-async function setToken(context: vscode.ExtensionContext, log: vscode.OutputChannel): Promise<void> {
+async function setToken(context: vscode.ExtensionContext, log: Logger): Promise<void> {
   const token = await vscode.window.showInputBox({
     title: 'OpenShock API Token',
     prompt: 'Stored securely in VS Code SecretStorage, never in settings.',
@@ -120,10 +125,7 @@ async function setToken(context: vscode.ExtensionContext, log: vscode.OutputChan
   void vscode.window.showInformationMessage('LaTeXShock: OpenShock API token saved.');
 }
 
-async function clearToken(
-  context: vscode.ExtensionContext,
-  log: vscode.OutputChannel,
-): Promise<void> {
+async function clearToken(context: vscode.ExtensionContext, log: Logger): Promise<void> {
   await context.secrets.delete(TOKEN_KEY);
   log.appendLine('[token] cleared');
   void vscode.window.showInformationMessage('LaTeXShock: OpenShock API token cleared.');

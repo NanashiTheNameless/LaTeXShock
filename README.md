@@ -82,21 +82,124 @@ Compile failures are always a single binary shock regardless of mode.
 
 ## Install
 
-Grab the latest `.vsix` from the **Nightly (Rolling)** release, then in VS Code
-run **Extensions: Install from VSIX…** and pick the downloaded file. Every push
-to `main` rebuilds and refreshes that release automatically. CI also attaches
-the built `.vsix` as an artifact to each pull request.
+This extension is not on the Marketplace; install the `.vsix` directly.
+
+### Get the `.vsix`
+
+- **Nightly (Rolling) release** (recommended) - grab the latest `.vsix` from the
+  [Nightly (Rolling)](https://github.com/NanashiTheNameless/LaTeXShock/releases/tag/Nightly-Rolling)
+  release. Every push to `main` rebuilds and refreshes it automatically.
+- **Per-PR artifact** - CI attaches the built `.vsix` as an artifact to each
+  pull request, under the run's **Artifacts** section.
+- **Build it yourself** - see [Development](#development) below.
+
+### Install the `.vsix`
+
+**From the UI:**
+
+1. Open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+2. Click the `…` menu at the top of the panel.
+3. Choose **Install from VSIX…** and pick the downloaded file.
+4. Reload the window if prompted.
+
+**From the command line:**
+
+```sh
+code --install-extension latexshock.vsix
+# VSCodium:
+codium --install-extension latexshock.vsix
+```
+
+After installing, continue to [Setup](#setup) - the extension ships **disabled**
+and does nothing until you configure and enable it.
+
+## Using the extension
+
+Everything is driven by two pieces of VS Code UI: the **Command Palette** (for
+one-off actions) and **Settings** (for how hard it hits).
+
+### The Command Palette
+
+The Command Palette is how you run every LaTeXShock command.
+
+- **Open it:** `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (macOS). `F1`
+  works too, as does **View → Command Palette…** in the menu bar.
+- **Use it:** start typing `LaTeXShock` - the list filters as you type. Use
+  `↑`/`↓` to pick a command and `Enter` to run it. `Esc` closes it without
+  running anything.
+
+If nothing matches, the extension isn't installed or isn't active yet; check
+**Extensions** (`Ctrl+Shift+X` / `Cmd+Shift+X`) for LaTeXShock.
+
+### Commands
+
+| Command                                   | What it does                                               |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| **LaTeXShock: Set OpenShock API Token**   | Prompts for your token; stores it in SecretStorage.        |
+| **LaTeXShock: Clear OpenShock API Token** | Deletes the stored token. Nothing can be sent without one. |
+| **LaTeXShock: Send Test Shock**           | Fires a fixed power-1, 300 ms shock. Ignores `enabled`.    |
+| **LaTeXShock: Enable**                    | Sets `latexShock.enabled` to `true`.                       |
+| **LaTeXShock: Disable**                   | Sets `latexShock.enabled` to `false`.                      |
+| **LaTeXShock: Show Log**                  | Reveals the live output channel.                           |
+| **LaTeXShock: Open Log File**             | Opens the on-disk log in an editor.                        |
+
+### Changing settings
+
+- **Open Settings:** `Ctrl+,` (Windows/Linux) or `Cmd+,` (macOS), or
+  **File → Preferences → Settings**.
+- Search for `latexShock` and stay on the **User** tab - every setting is
+  application-scoped, so the Workspace tab won't offer them (see [Safety](#safety)).
+- Prefer editing JSON? Run **Preferences: Open User Settings (JSON)** from the
+  Command Palette and add keys like `"latexShock.power.max": 60`.
 
 ## Setup
 
-1. Install the extension.
-2. Run **LaTeXShock: Set OpenShock API Token** and paste your token (stored in
-   VS Code SecretStorage, never in settings).
-3. Set `latexShock.connection.shockerId` to your shocker's ID.
-4. (Recommended) Turn on `latexShock.dryRun` and build a document - the
-   **LaTeXShock** output channel logs what *would* be sent so you can tune
-   weights and curves without shocking yourself.
-5. When you're happy, turn off `dryRun` and run **LaTeXShock: Enable**.
+1. **Install the extension** (see [Install](#install)).
+2. **Store your API token.** Open the Command Palette and run **LaTeXShock: Set
+   OpenShock API Token**, then paste your OpenShock token and press `Enter`. It
+   goes into VS Code SecretStorage, never into settings, and never into a file
+   you might commit.
+3. **Set your shocker ID.** In Settings, search `latexShock.connection.shockerId`
+   and paste the ID of the shocker you want to fire.
+4. **Prove the connection works.** Run **LaTeXShock: Send Test Shock**. It's
+   fixed at intensity 1 for 300 ms and works whether or not the extension is
+   enabled. If nothing happens, run **LaTeXShock: Show Log** - a missing token or
+   shocker ID is reported there.
+5. **Dry-run first (recommended).** Turn on `latexShock.dryRun`, then build a
+   document. The log shows what *would* have been sent, so you can tune
+   `weights.*`, `scaling.*`, `power.*`, and `duration.*` without being shocked
+   for your own configuration mistakes.
+6. **Go live.** Turn off `dryRun` and run **LaTeXShock: Enable**. Builds now
+   trigger real shocks.
+
+To stop it at any point, run **LaTeXShock: Disable**. To stop it permanently and
+completely, also run **LaTeXShock: Clear OpenShock API Token**.
+
+### Day to day
+
+Once enabled, there's nothing to run - the extension watches build tasks and the
+Problems panel on its own. Build your document as usual and it reacts:
+
+- Build task exits non-zero → one full-strength shock (`power.failureOverride`).
+- Build succeeds with warnings → a scaled shock (or a pulse train in
+  `pulses` mode), sized by the weighted severity score.
+- Build is clean → nothing.
+
+If a build produced something you didn't expect, **LaTeXShock: Show Log** shows
+the counts, the score, and the resulting power/duration for every decision.
+
+## Logging
+
+Every decision the extension makes is logged twice:
+
+- **Live** - the **LaTeXShock** output channel, via **LaTeXShock: Show Log**.
+- **On disk** - a timestamped `latexshock.log` in the window session's extension
+  log directory, opened with **LaTeXShock: Open Log File**. The path is also
+  printed at the top of the output channel on activation.
+
+The file survives a closed panel or a reloaded window, so what was actually sent
+to a real device stays auditable after the fact. VS Code allocates a fresh log
+directory per window session, so the file rotates on its own.
 
 ## Scaling
 
@@ -126,7 +229,16 @@ These are enforced regardless of any other setting:
   Requests inside the window are **dropped, never queued**, so a bad settings
   combination can't send back-to-back shocks.
 
-Durations are additionally clamped to the OpenShock-safe range (300-30000 ms).
+Durations are additionally clamped to the OpenShock-safe range (300-65535 ms).
+
+**`latexShock.enabled` gates *automatic* shocks only.** **LaTeXShock: Send Test
+Shock** is an explicit, user-initiated action and fires whether the extension is
+enabled or not. Its output is **hard-coded to intensity 1 for 300 ms** - the
+lowest non-zero intensity and the shortest duration OpenShock accepts, ignoring
+`power.*` and `duration.*` entirely - so proving your connection works can't be
+made painful by a mistuned setting. It still obeys `dryRun`, the cooldown, and
+`hardMaxPower`. If you want to be certain nothing can fire, leave `dryRun` on or
+clear your API token.
 
 **Every setting is `application` (user) scope.** Nothing is settable via a
 workspace's `.vscode/settings.json`, so a shared repository can never influence
@@ -143,11 +255,14 @@ list. Key groups: `triggers.*` (what counts), `weights.*` (per-issue severity),
 
 ## Development
 
+This project uses **Yarn Berry** (Yarn 4). Enable it via Corepack:
+
 ```sh
-npm install
-npm run compile   # or: npm run watch
-npm test          # unit tests (scoring curves, classifier, log parser)
-npx @vscode/vsce package   # build an installable .vsix locally
+corepack enable
+yarn install
+yarn compile   # or: yarn watch
+yarn test      # unit tests (scoring curves, classifier, log parser)
+npx @vscode/vsce package --no-yarn   # build an installable .vsix locally
 ```
 
 Press `F5` in VS Code to launch an Extension Development Host.

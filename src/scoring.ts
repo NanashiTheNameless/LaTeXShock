@@ -13,7 +13,7 @@ export interface ShockPlan {
 }
 
 const OPENSHOCK_MIN_MS = 300;
-const OPENSHOCK_MAX_MS = 30000;
+const OPENSHOCK_MAX_MS = 65535;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
