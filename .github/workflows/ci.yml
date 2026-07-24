@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -138,3 +139,35 @@ jobs:
         run: |
           cp latexshock.vsix latexshock-latest.vsix
           gh release upload Nightly-Rolling latexshock-latest.vsix --clobber
+
+  # Publish a tagged release to Open VSX. Runs only for version tags (v*), so a
+  # given version is published exactly once - Open VSX rejects re-publishing an
+  # existing version. Bump package.json, tag vX.Y.Z, push the tag.
+  openvsx-release:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: latexshock-vsix
+
+      # A vX.Y.Z tag that doesn't match the packaged version would publish the
+      # wrong build under the tag's name. Fail loudly instead.
+      - name: Verify tag matches package.json version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+          echo "publishing version $pkg"
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx --yes ovsx publish latexshock.vsix -p "$OVSX_PAT"

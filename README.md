@@ -314,6 +314,12 @@ The scoring/curve math, the diagnostic classifier, and the `.log` parser are
 pure (no `vscode` dependency at runtime) and covered by `node --test` unit
 tests under `test/`. CI runs compile + tests on the current Node LTS and latest.
 
+### Releasing to Open VSX
+
+Tagged versions are published to [Open VSX](https://open-vsx.org) automatically,
+so VSCodium and other Open VSX editors can install and **auto-update** the
+extension normally (a hand-installed `.vsix` never auto-updates).
+
 ## License
 
 This project is licensed under the **Do What The Fuck You Want To Public
