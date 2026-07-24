@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Current LTS and the latest release, resolved at run time so the
+        # matrix tracks "LTS + latest" without needing version bumps.
+        node-version: [lts/*, latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Test
+        run: npm test
+
+  # Build the installable .vsix on every run so it can be downloaded from any
+  # PR and is ready for the nightly release on main.
+  package:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js (LTS)
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package extension (.vsix)
+        run: npx --yes @vscode/vsce package --out latexshock.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: latexshock-vsix
+          path: latexshock.vsix
+          if-no-files-found: error
+          retention-days: 14
+
+  # Publish the built .vsix to a single rolling "Nightly-Rolling" prerelease,
+  # only for pushes to main.
+  nightly-release:
+    needs: package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: nightly-rolling
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: latexshock-vsix
+
+      - name: Ensure Nightly-Rolling release exists
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view Nightly-Rolling >/dev/null 2>&1; then
+            gh release create Nightly-Rolling \
+              --latest \
+              --title "Nightly (Rolling)" \
+              --notes "Rolling nightly build of the LaTeXShock extension, updated automatically from main. Download the latest .vsix asset below and install it with the \"Extensions: Install from VSIX...\" command." \
+              --target "$GITHUB_SHA"
+          fi
+          # Enforce non-prerelease + latest even if the release pre-existed
+          # (e.g. was created as a prerelease by an earlier run).
+          gh release edit Nightly-Rolling --latest --prerelease=false
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/Nightly-Rolling" --jq .id)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "upload_url=https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$id/assets{?name,label}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish VSIX to Nightly-Rolling
+        uses: NanashiTheNameless/deploy-nightly@master
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          release_id: ${{ steps.release.outputs.id }}
+          asset_path: ./latexshock.vsix
+          asset_name: latexshock-$$.vsix
+          asset_content_type: application/octet-stream
+          max_releases: 7
+          token: ${{ github.token }}
