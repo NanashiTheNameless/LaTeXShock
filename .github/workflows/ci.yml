@@ -25,10 +25,9 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-          cache: yarn
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Enable Corepack and prepare Yarn
+        run: corepack enable && corepack prepare yarn@4.12.0 --activate
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -51,10 +50,9 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: lts/*
-          cache: yarn
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Enable Corepack and prepare Yarn
+        run: corepack enable && corepack prepare yarn@4.12.0 --activate
 
       - name: Install dependencies
         run: yarn install --immutable
