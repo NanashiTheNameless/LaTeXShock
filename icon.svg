@@ -1,0 +1,10 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Opaque background so the icon reads on both light and dark listings. -->
+  <rect width="128" height="128" fill="#8b0000"/>
+  <!-- Lightning bolt: the shock. One bold shape, legible at 16px. -->
+  <path d="M74 20 L40 70 H60 L54 108 L90 54 H68 Z"
+        fill="#ffffff"
+        stroke="#4d0000"
+        stroke-width="4"
+        stroke-linejoin="round"/>
+</svg>
